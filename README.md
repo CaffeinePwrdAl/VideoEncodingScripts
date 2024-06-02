@@ -26,5 +26,12 @@ options:
 
 ### Examples
 
-* Olympus E-PL8 - MOV -> MP4, keep audio. 27.6mb -> 7.7mb
+* Olympus E-PL8 - MOV -> MP4
+
+| Codec | Image |
+| :---: | :---: |
+| .mov (original, 27.6mb) | <img alt="Still from video from Olympus E-PL8" src="images/japfest_2024_mov.png?raw=true" width="100%" title="Still from video from Olympus E-PL8"> |
+| .mp4 (h265, 7.7mb) | <img alt="Still from video re-encoded as h265" src="images/japfest_2024_h265.png?raw=true" width="100%" title="Still from video re-encoded as h265"> |
+| diff (tol=5/255) | <img alt="Diff of images" src="images/japfest_2024_diff.png?raw=true" width="100%" title="Diff of images"> |
+
 * Canon 70D - MOV -> MP4, keep audio. 101MB -> 21MB
