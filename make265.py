@@ -34,52 +34,63 @@ def make_encode_commandline(args, v):
     # ffmpeg.exe -i [input_file]
     arguments = [executable, '-i', v.input]
     
-    if args.profile == 'tv':    
-        #
-        # GPU Encoding - using hevc_nvenc, this obviously is NVIDIA specific, will
-        # need to profile the Intel card to see what it's capable of.
-        #
-        # This gets about 6.5x on a GTX1080
-        #
-        if args.gpu:
-            arguments = [executable, '-hwaccel_output_format', 'cuda', '-i', v.input] 
-            arguments += ['-c:v', 'hevc_nvenc', '-preset', 'slow']
-            if 0:
-                # Around 2.8GB for s01e01
-                # Variable bit rate
-                arguments += ['-rc', 'vbr']
-                # Min max quantisation
-                arguments += ['-cq', '27', '-qmin', '27', '-qmax', '27', '-b:v', '0']
-            else:
-                # 27 is good qual, 2.7GB for s01e01
-                # 30 is very comparable in quality and size to 25 on x265
-                arguments += ['-rc', 'constqp', '-qp', '30', '-b:v', '0K']
-            # Min max bitrate
-            # arguments += ['-b:v', '2M', '-maxrate:v', '10M']
-        #
-        # CPU Encoding - using x265 which is still remarkably fast, but not quite
-        # as quick as the GPU encoding above
-        #
-        # 13th Gen i7 was getting about 2.6x for 1920x1080 bluray content
-        #
-        else:
-            output_filename += ['x265']
-            # 18 and 23 show minimal differences, even in beyond compare. Doubles encoding fps
-            # 25 aq 3 is 2.2GB for s01e01 which I'm happy with
-            arguments += ['-c:v', 'libx265', '-preset', 'medium', '-crf', '25', '-aq-mode', '3']
-            
-            # Reduce length of intra predicted frames
-            arguments += ['-x265-params', 'keyint=96']
-            
-    else:
-        print("TODO")
-
-    # Copy audio and sub-titles as-is
-    arguments += ['-map', '0', '-c:a', 'copy', '-c:s', 'copy']
-
-    # Complete filename
-
+    #
+    # Quantisation parameters for different profiles [GPU, CPU]
+    #
+    quant_values = {
+        'default':       { 'cpu': 27, 'gpu': 25 },
+        'canon':         { 'cpu': 18, 'gpu': 23 },
+        'olympus':       { 'cpu': 16, 'gpu': 20 },
+    }
+    qp = quant_values['default']
+    if args.profile in quant_values.keys():
+        qp = quant_values[args.profile]
+        
+    print(qp)
     
+    #
+    # GPU Encoding - using hevc_nvenc, this obviously is NVIDIA specific, will
+    # need to profile the Intel card to see what it's capable of.
+    #
+    # This gets about 6.5x on a GTX1080
+    #
+    if args.gpu:
+        arguments = [executable, '-hwaccel_output_format', 'cuda', '-i', v.input] 
+        arguments += ['-c:v', 'hevc_nvenc', '-preset', 'slow']
+        if 0:
+            # Around 2.8GB for s01e01
+            # Variable bit rate
+            arguments += ['-rc', 'vbr']
+            # Min max quantisation. 27 good, but fairly big
+            arguments += ['-cq', '27', '-qmin', '27', '-qmax', '27', '-b:v', '0']
+        else:
+            # 27 is good qual, 2.7GB for s01e01
+            # 30 is very comparable in quality and size to 25 on x265
+            arguments += ['-rc', 'constqp', '-qp', qp['gpu'], '-b:v', '0K']
+        # Min max bitrate
+        # arguments += ['-b:v', '2M', '-maxrate:v', '10M']
+    #
+    # CPU Encoding - using x265 which is still remarkably fast, but not quite
+    # as quick as the GPU encoding above
+    #
+    # 13th Gen i7 was getting about 2.6x for 1920x1080 bluray content
+    #
+    else:
+        # 18 and 23 show minimal differences, even in beyond compare. Doubles encoding fps
+        # 25 aq 3 is 2.2GB for s01e01 which I'm happy with
+        arguments += ['-c:v', 'libx265', '-preset', 'medium', '-crf', qp['cpu'], '-aq-mode', '3']
+        
+        # Reduce length of intra predicted frames
+        arguments += ['-x265-params', 'keyint=96']
+
+    if args.profile == 'olympus' or args.profile == 'canon':
+        # Copy audio, no subs, avoid issues with timecodes - might be due to MOV files
+        arguments += ['-c:a', 'copy']
+    else:
+        # Copy audio and sub-titles as-is
+        arguments += ['-map', '0', '-c:a', 'copy', '-c:s', 'copy']
+    
+    # Output
     arguments += [v.base_name]
      
     return [str(x) for x in arguments]
@@ -102,7 +113,7 @@ def check_input_params(args, filename, episode=None):
     input_filename = os.path.join(base_dir, input_name + extn)
     base_name = input_name
 
-    if extn not in ['.mkv', '.mp4', '.avi', '.mpg']:
+    if extn.lower() not in ['.mkv', '.mp4', '.avi', '.mpg', '.mov']:
         print("Skipping file", filename, "unexpected extension '", extn, "'")
         return None
     
